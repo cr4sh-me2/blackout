@@ -23,19 +23,10 @@ banner(){
     printf "<----- WPS Blackout v1.0 ----->\n"
 }
 
-function ifup {
-    if [[ ! -d /sys/class/net/${1} ]]; then
-        # printf 'No such interface: %s\n' "$1" >&2
-        return 1
-    else
-        [[ $(</sys/class/net/${1}/operstate) == up ]]
-    fi
-}
-
 check_ifaces(){
     printf "\n\e[0m[\e[93m*\e[0m] Checking interfaces... \n"
 
-    if ifup wlan0; then
+    if ip addr 2>/dev/null | grep "wlan0"; then
         printf "\n\e[0m[\e[92mi\e[0m] \e[92mwlan0\e[0m is up!\n"
         ip link set wlan0 up
         wlan0_iface=1
@@ -44,7 +35,7 @@ check_ifaces(){
         wlan0_iface=0
     fi
 
-    if ifup wlan1; then
+    if ip addr 2>/dev/null | grep "wlan1"; then
         printf "\e[0m[\e[92mi\e[0m] \e[92mwlan1\e[0m is up!\n"
         ip link set wlan1 up
         wlan1_iface=1
