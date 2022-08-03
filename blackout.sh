@@ -1,6 +1,9 @@
 #!/bin/bash
 # WPS Blackout by @rkhunt3r
 
+first_iface="wlan0"
+second_iface="wlan1"
+
 check_root(){
     banner
     if [[ $EUID -ne 0 ]]; then
@@ -107,27 +110,29 @@ esac
 check_ifaces(){
     printf "\n\e[0m[\e[93m*\e[0m] Checking interfaces... \n"
 
-    if ip addr 2>/dev/null | grep -q "wlan0"; then
-        printf "\n\e[0m[\e[92mi\e[0m] \e[92mwlan0\e[0m is up!\n"
-        ip link set wlan0 up
-        wlan0_iface=1
+    if ip addr 2>/dev/null | grep -q "$first_iface"; then
+        printf "\n\e[0m[\e[92mi\e[0m] \e[92m$first_iface\e[0m is up!\n"
+        ip link set $first_iface up
+        iw dev $first_iface scan
+        first_iface=1
     else
-        printf "\n\e[0m[\e[91m!\e[0m] \e[91mwlan0\e[0m is down\n"
-        wlan0_iface=0
+        printf "\n\e[0m[\e[91m!\e[0m] \e[91m$first_iface\e[0m is down\n"
+        first_iface=0
     fi
 
-    if ip addr 2>/dev/null | grep -q "wlan1"; then
-        printf "\e[0m[\e[92mi\e[0m] \e[92mwlan1\e[0m is up!\n"
-        ip link set wlan1 up
-        wlan1_iface=1
+    if ip addr 2>/dev/null | grep -q "$second_iface"; then
+        printf "\e[0m[\e[92mi\e[0m] \e[92m$second_iface\e[0m is up!\n"
+        ip link set $second_iface up
+        iw dev $second_iface scan
+        second_iface=1
     else
-        printf "\e[0m[\e[91m!\e[0m] \e[91mwlan1\e[0m is down\n"
-        wlan1_iface=0
+        printf "\e[0m[\e[91m!\e[0m] \e[91m$second_iface\e[0m is down\n"
+        second_iface=0
     fi
 
-    sum_ifaces=$(expr $wlan1_iface + $wlan0_iface)
+    sum_ifaces=$(expr $second_iface + $first_iface)
 
-    if [[ "$wlan0_iface" == 0 && "$wlan1_iface" == 0 ]]; then
+    if [[ "$first_iface" == 0 && "$second_iface" == 0 ]]; then
         printf "\n\e[0m[\e[91m!\e[0m] No interfaces found!\n"
         exit
     else
@@ -160,14 +165,14 @@ wps_blackout(){
 
     printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_ssid[@]} WPS networks! \n"
 
-    printf "\n[ Select \e[91mone\e[0m, \e[91mmultiple\e[0m comma-separated or (\e[91ma\e[0m)ll target/s: ]\n\n"
+    printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or (\e[92ma\e[0m)ll target/s: ]\n\n"
 
     read -p "Choice: " target_number
 
     if [ $target_number  == "a" ];
     then
-        target_ssid="${wps_ssid[@]}"
-        target_bssid="${wps_bssid[@]}"
+        target_ssid=("${wps_ssid[@]}")
+        target_bssid=("${wps_bssid[@]}")
     else
         target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
         target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
