@@ -113,7 +113,6 @@ check_ifaces(){
     if ip addr 2>/dev/null | grep -q "$first_iface"; then
         printf "\n\e[0m[\e[92mi\e[0m] \e[92m$first_iface\e[0m is up!\n"
         ip link set $first_iface up
-        iw dev $first_iface scan
         first_iface=1
     else
         printf "\n\e[0m[\e[91m!\e[0m] \e[91m$first_iface\e[0m is down\n"
@@ -123,7 +122,6 @@ check_ifaces(){
     if ip addr 2>/dev/null | grep -q "$second_iface"; then
         printf "\e[0m[\e[92mi\e[0m] \e[92m$second_iface\e[0m is up!\n"
         ip link set $second_iface up
-        iw dev $second_iface scan
         second_iface=1
     else
         printf "\e[0m[\e[91m!\e[0m] \e[91m$second_iface\e[0m is down\n"
