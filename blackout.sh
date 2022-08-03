@@ -160,17 +160,15 @@ wps_blackout(){
 
     printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_ssid[@]} WPS networks! \n"
 
-    printf "\n[ Select one, multiple or (a)ll target/s: ]\n\n"
+    printf "\n[ Select \e[91mone\e[0m, \e[91mmultiple\e[0m comma-separated or (\e[91ma\e[0m)ll target/s: ]\n\n"
 
     read -p "Choice: " target_number
 
     if [ $target_number  == "a" ];
     then
-        printf "\nSelecting all!\n"
         target_ssid="${wps_ssid[@]}"
         target_bssid="${wps_bssid[@]}"
     else
-        printf "\nSelecting multiple!\n"
         target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
         target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
     fi
@@ -197,7 +195,7 @@ wps_blackout(){
 
     sleep 5
 
-    printf "\n\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n\n"
+    printf "\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n\n"
 
     LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
     do nmcli con up uuid $line &>/dev/null;    
