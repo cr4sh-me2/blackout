@@ -1,7 +1,9 @@
 # BLACKOUT
-Pwn all wps networks in range using OneShot
 
-OneShot have option to scan and select wps networks, but you can select only 1 target
+[IN PROGRESS]
+
+Blackout networks using simple shell script
+It uses OneShot for WPS blackout
 
 ## Installation
 
