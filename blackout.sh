@@ -137,7 +137,7 @@ check_ifaces(){
 }
 
 wps_blackout(){
-
+    banner
     check_ifaces
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
 
