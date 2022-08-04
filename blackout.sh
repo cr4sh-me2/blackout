@@ -211,7 +211,7 @@ blackout_menu(){
 
 [1] WPS Blackout
 [2] Deauth blackout 
-[3] All-in-one blackout (WAIT)
+[3] All-in-one blackout 
 [4] Settings
 [*] Exit
 
@@ -261,14 +261,15 @@ wps_blackout(){
     printf "\n[ Select (\e[92m1\e[0m-\e[92m${#wps_bssid[@]}\e[0m) \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
     read -p "Choice: " target_number
 
-    if [ -z "$target_number" ];
+    if [ automode == "1" ] || [ -z "$target_number" ];
     then
+        printf "\n\e[0m[\e[92mi\e[0m] Selecting all networks! \n"
         target_bssid=("${wps_bssid[@]}")
         target_ssid=("${wps_ssid[@]}")
     else
         target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
         target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
-    fi
+    fi    
 
     printf "\n[ Disconnect wifi before attack? (\e[92my\e[0m/\e[92mn\e[0m): ]\n\n"
     read -p "Choice: " wifi_disconnect
@@ -368,8 +369,9 @@ deauth_blackout(){
     printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
     read -p "Choice: " wifi_number
 
-    if [ -z "$wifi_number" ];
-    then
+    if [ $automode == "1" ] || [ -z "$wifi_number" ];
+    then    
+        printf "\n\e[0m[\e[92mi\e[0m] Selecting all networks! \n"
         target_bssid=("${wifi_bssid[@]}")
         target_ssid=("${wifi_ssid[@]}")
     else
@@ -397,8 +399,46 @@ deauth_blackout(){
     back_to_menu
 }
 
+# beacon_blackout(){
+    
+# }
+
+all_blackout(){ 
+
+    if [ automode == 0 ];
+    then
+        automode = 1;
+        backup=1
+    fi
+
+    banner
+    chk_iface $first_iface
+    chk_iface $second_iface
+    set_mmode $second_iface
+    printf "\n\e[0m[\e[92mi\e[0m] Using config below! \n"
+    printf "
+-----All-in-one-----
+| Deauth: $auto_deauth 
+| Beacon: $auto_beacon 
+--------------------
+"
+    # printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
+
+    # if [ $auto_beacon == 1 ];
+    # then
+    #     printf "\n\e[0m[\e[93m*\e[0m] Starting beacon flood...\n\n"
+    #     mdk4 $second_iface b 2>/dev/null &
+    # fi
+
+    # if [ $backup == 1 ];
+    # then
+    #     printf "\n\e[0m[\e[92mi\e[0m] Restoring automode settings... \n"
+    #     automode=0
+    # fi
+
+}
+
 check_root
-# check_internet
 check_update
 req_check
 blackout_menu
