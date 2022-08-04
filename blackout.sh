@@ -113,19 +113,19 @@ check_ifaces(){
     if ip addr 2>/dev/null | grep -q "$first_iface"; then
         printf "\n\e[0m[\e[92mi\e[0m] \e[92m$first_iface\e[0m is up!\n"
         ip link set $first_iface up
-        first_iface=1
+        first_iface_up=1
     else
         printf "\n\e[0m[\e[91m!\e[0m] \e[91m$first_iface\e[0m is down\n"
-        first_iface=0
+        first_iface_up=0
     fi
 
     if ip addr 2>/dev/null | grep -q "$second_iface"; then
         printf "\e[0m[\e[92mi\e[0m] \e[92m$second_iface\e[0m is up!\n"
         ip link set $second_iface up
-        second_iface=1
+        second_iface_up=1
     else
         printf "\e[0m[\e[91m!\e[0m] \e[91m$second_iface\e[0m is down\n"
-        second_iface=0
+        second_iface_ip=0
     fi
 
     sum_ifaces=$(expr $second_iface + $first_iface)
@@ -146,14 +146,13 @@ wps_blackout(){
 
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks (15s)... \n"
 
-    #iq200 sorting wps networks by signal strenght & ssid space removal
+    #iq200 sorting wps networks by signal strenght
     awker="$(pwd)/config/wifi.awk"
     wps_all=$(iw dev wlan0 scan duration 5 | awk -f $awker | sort)
     wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
-    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6}')) 
+    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6}'))
     wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
     wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $4}'))
-
 
     i=0
     while [ $i -lt ${#wps_bssid[@]} ]
@@ -199,9 +198,6 @@ wps_blackout(){
         do nmcli con down uuid $line &>/dev/null;    
         done
     fi
-
-    # printf "\n\e[0m[\e[92mi\e[0m] Disconnecting wifi network...\n"
-    
 
     printf "\n\e[0m[\e[93m*\e[0m] Attacking network/s using OneShot... \n"
 
