@@ -37,6 +37,7 @@ check_internet(){
 
 req_check(){
     banner
+    check_internet
     if [ -d $(pwd)/config/OneShot ];then
         printf "\n\e[0m[\e[92mi\e[0m] OneShot folder found! \n"
     else
@@ -397,7 +398,6 @@ deauth_blackout(){
 }
 
 check_root
-check_internet
 check_update
 req_check
 blackout_menu
