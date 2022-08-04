@@ -48,7 +48,7 @@ req_check(){
 back_to_menu(){
     printf "\n\e[0m[\e[92mi\e[0m] Press [ENTER] to return to menu\n"
     read ener_empty_value
-    onehit_menu
+    blackout_menu
 }
 
 empty_input(){
