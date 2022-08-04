@@ -34,7 +34,7 @@ $1 == "signal:" {
 }
 END {
     for (w in wifi) {
-        printf "%s %s %s %s %s\n", wifi[w]["Sig"], wifi[w]["SSID"], w, \
-               wifi[w]["WPS"], wifi[w]["Ch"]
+        printf "%s %s %s %s %s\n", wifi[w]["Sig"], w, \
+               wifi[w]["WPS"], wifi[w]["Ch"], wifi[w]["SSID"]
     }
 }
