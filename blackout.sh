@@ -17,6 +17,7 @@ check_root(){
 }
 
 check_update(){
+    check_internet
     changed=0
     git remote update && LC_ALL=C git status -uno | grep -q 'Your branch is behind' && changed=1
         if [ $changed = 1 ]; then
@@ -37,7 +38,6 @@ check_internet(){
 
 req_check(){
     banner
-    check_internet
     if [ -d $(pwd)/config/OneShot ];then
         printf "\n\e[0m[\e[92mi\e[0m] OneShot folder found! \n"
     else
@@ -238,10 +238,10 @@ wps_blackout(){
     #iq200 sorting wps networks by signal strenght
     awker="$(pwd)/config/wifi.awk"
     wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
-    wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
-    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6 $7}'))
-    wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
-    wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $4}'))
+    wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
+    wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6 $7}'))
+    wps_bssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $2}'))
+    wps_channel=($(printf "$wps_all" | grep -a "yes" | awk '{print $4}'))
 
     i=0
     while [ $i -lt ${#wps_bssid[@]} ]
@@ -258,7 +258,7 @@ wps_blackout(){
         printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
     fi
 
-    printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
+    printf "\n[ Select (\e[92m1\e[0m-\e[92m${#wps_bssid[@]}\e[0m) \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
     read -p "Choice: " target_number
 
     if [ -z "$target_number" ];
@@ -398,6 +398,7 @@ deauth_blackout(){
 }
 
 check_root
+# check_internet
 check_update
 req_check
 blackout_menu
