@@ -195,7 +195,7 @@ blackout_menu(){
 [1] WPS Blackout
 [2] Deauth blackout (WAIT)
 [3] All-in-one blackout (WAIT)
-[4] Settings (WAIT)
+[4] Settings
 [*] Exit
 
 "
