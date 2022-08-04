@@ -1,8 +1,11 @@
 #!/bin/bash
 # WPS Blackout by @rkhunt3r
 
-first_iface="wlan0"
-second_iface="wlan1"
+# first_iface="wlan0"
+# second_iface="wlan1"
+
+settings_file="config/settings.conf"
+source $settings_file
 
 check_root(){
     banner
@@ -42,6 +45,107 @@ req_check(){
     fi
 }
 
+back_to_menu(){
+    printf "\n\e[0m[\e[92mi\e[0m] Press [ENTER] to return to menu\n"
+    read ener_empty_value
+    onehit_menu
+}
+
+empty_input(){
+    if [ -z "$input" ];
+    then
+        printf "\n\e[0m[\e[91m!\e[0m] Input can't be empty!";
+        back_to_menu
+    fi
+}
+
+default_first_iface(){
+    printf "\n\e[0m[\e[92mi\e[0m] Current first wireless iface = $first_iface\n"
+    read -p "New value: " input
+    empty_input
+    sed -i "s/first_iface\=.*/first_iface=$input/" $settings_file
+    source $settings_file
+    config_settings
+}
+
+default_second_iface(){
+    printf "\n\e[0m[\e[92mi\e[0m] Current second wireless iface = $second_iface\n"
+    read -p "New value: " input
+    empty_input
+    sed -i "s/second_iface\=.*/second_iface=$input/" $settings_file
+    source $settings_file
+    config_settings
+}
+
+reset_settings(){
+    printf "\n\e[0m[\e[93m*\e[0m] Resetting config...\n"
+    sleep 1
+    sed -i "s/first_iface\=.*/first_iface=wlan0/" $settings_file
+    sed -i "s/second_iface\=.*/second_iface=wlan1/" $settings_file
+    source $settings_file
+    config_settings
+}
+
+settings_menu(){
+    banner
+    printf "[ Choose option: ]
+
+[1] Update script
+[2] Change settings
+[*] Back
+
+"
+read -p "Choice: " menuchoice
+
+case $menuchoice in
+1) update_me;;
+2) config_settings;;
+*) blackout_menu;;
+esac
+
+}
+
+config_settings(){
+    banner
+    printf "<---- CURRENT SETTINGS ---->
+first_iface=$first_iface
+second_iface=$second_iface
+<-------------------------->
+
+[ Select setting to edit: ]
+
+[1] Default wireless interface
+[2] Second default fireless interface
+[3] Reset settings
+[*] Back\n
+"
+    read -p "Choice: " sel
+    case $sel in
+    1) default_first_iface;;
+    2) default_second_iface;;
+    3) reset_settings;;
+    *) settings_menu ;;
+    esac
+}
+
+update_me(){
+
+    if [ $updates == 1 ]; then
+        printf "\n\e[0m[\e[93m*\e[0m] Updating blackout script! Please wait... \n"
+        git stash
+        git stash drop
+        git pull
+        printf "\n\e[0m[\e[92mi\e[0m] Done! Press [ENTER] to run updated script \n"
+        read ener_empty_value
+        sudo bash blackout.sh
+
+    else
+        printf "\n\e[0m[\e[91m!\e[0m] There is no updates avaiable! \n"
+        back_to_menu
+    fi
+
+}
+
 banner(){
     clear
     printf "\e[1m\e[38;5;82m"
@@ -74,6 +178,7 @@ check_ifaces(){
 
     if [[ "$wlan0_iface" == 0 && "$wlan1_iface" == 0 ]]; then
         printf "\n\e[0m[\e[91m!\e[0m] No interfaces found!\n"
+        back_to_menu
         exit
     else
         printf "\n\e[0m[\e[92mi\e[0m] We have \e[92m$sum_ifaces\e[0m inteface/s up!\n"
@@ -150,7 +255,7 @@ wps_blackout(){
     awker="$(pwd)/config/wifi.awk"
     wps_all=$(iw dev wlan0 scan duration 5 | awk -f $awker | sort)
     wps_power=($(printf "$wps_all" | grep "yes" | awk '{print $1}'))
-    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6}'))
+    wps_ssid=($(printf "$wps_all" | grep "yes" | awk '{print $5 $6 $7}'))
     wps_bssid=($(printf "$wps_all" | grep "yes" | awk '{print $2}'))
     wps_channel=($(printf "$wps_all" | grep "yes" | awk '{print $4}'))
 
@@ -161,7 +266,15 @@ wps_blackout(){
         i=$((i+1))
     done
 
-    printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
+    if [ -z "${#wps_bssid[@]}" ];
+    then
+        printf "\n\n\e[0m[\e[91m!\e[0m] No WPS networks found! \n"
+        back_to_menu
+    else
+        printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
+    fi
+
+   
 
     printf "\n[ Select \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
 
