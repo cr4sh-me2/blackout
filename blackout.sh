@@ -36,10 +36,19 @@ check_update() {
   fi
 }
 
+back_to_menu() {
+  printf "\n\e[0m[\e[92mi\e[0m] Press [ENTER] to return to menu\n"
+  read ener_empty_value
+  blackout_menu
+}
+
 check_internet() {
   printf "\n\e[0m[\e[93m*\e[0m] Checking for internet connection... \n"
   if ! ping -q -c1 google.com &>/dev/null; then
-    printf "\e[0m[\e[91m!\e[0m] Network isn't avaiable! \n" && exit
+    printf "\e[0m[\e[91m!\e[0m] Network isn't avaiable! \n"
+    updates=0
+    updates_string="\e[0m\e[91mCheck connection!\e[0m"
+    back_to_menu
   fi
 }
 
@@ -65,12 +74,6 @@ chk_iface() {
     back_to_menu
   fi
 
-}
-
-back_to_menu() {
-  printf "\n\e[0m[\e[92mi\e[0m] Press [ENTER] to return to menu\n"
-  read ener_empty_value
-  blackout_menu
 }
 
 empty_input() {
