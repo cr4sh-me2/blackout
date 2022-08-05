@@ -8,6 +8,13 @@ ssid_config="config/ssid.txt"
 settings_file="config/settings.conf"
 source $settings_file
 
+trap ctrl_c INT
+
+function ctrl_c() {
+    printf "\n\n\e[0m[\e[91m!\e[0m] Ctrl+C detected! Use menu keys to exit...\n"
+    back_to_menu
+}
+
 check_root(){
     banner
     if [[ $EUID -ne 0 ]]; then
@@ -94,10 +101,40 @@ default_second_iface(){
     config_settings
 }
 
+scan_accuracy_var(){
+    printf "\n\e[0m[\e[92mi\e[0m] Current scan accuracy = $scan_accuracy\n"
+    read -p "New value: " input
+    empty_input
+    sed -i "s/scan_accuracy\=.*/scan_accuracy=$input/" $settings_file
+    source $settings_file
+    config_settings
+}
+
+automode_var(){
+    printf "\n\e[0m[\e[92mi\e[0m] Current autmode = $automode\n"
+    read -p "New value: " input
+    empty_input
+    sed -i "s/automode\=.*/automode=$input/" $settings_file
+    source $settings_file
+    config_settings
+}
+
+mac_changer_var(){
+    printf "\n\e[0m[\e[92mi\e[0m] Current mac changer value = $mac_changer\n"
+    read -p "New value: " input
+    empty_input
+    sed -i "s/mac_changer\=.*/mac_changer=$input/" $settings_file
+    source $settings_file
+    config_settings
+}
+
 reset_settings(){
     printf "\n\e[0m[\e[93m*\e[0m] Resetting config...\n"
     sleep 1
     sed -i "s/first_iface\=.*/first_iface=wlan0/" $settings_file
+    sed -i "s/automode\=.*/automode=0/" $settings_file
+    sed -i "s/scan_accuracy\=.*/scan_accuracy=2/" $settings_file
+    sed -i "s/mac_changer\=.*/mac_changer=1/" $settings_file
     sed -i "s/second_iface\=.*/second_iface=wlan1/" $settings_file
     source $settings_file
     config_settings
@@ -124,23 +161,32 @@ esac
 
 config_settings(){
     banner
-    printf "<---- CURRENT SETTINGS ---->
-first_iface=$first_iface
-second_iface=$second_iface
+    printf "<---- Current settings ---->
+first_iface: \e[92m$first_iface\e[0m
+second_iface: \e[92m$second_iface\e[0m
+automode: \e[92m$automode\e[0m
+mac_changer: \e[92m$mac_changer\e[0m
+scan_accuracy: \e[92m$scan_accuracy\e[0m
 <-------------------------->
 
 [ Select setting to edit: ]
 
 [1] Default wireless interface
 [2] Second default fireless interface (with monitor mode support)
-[3] Reset settings
+[3] Automode
+[4] MAC changer
+[5] Scan accuracy
+[6] Reset settings
 [*] Back\n
 "
     read -p "Choice: " sel
     case $sel in
     1) default_first_iface;;
     2) default_second_iface;;
-    3) reset_settings;;
+    3) automode_var;;
+    4) mac_changer_var;;
+    5) scan_accuracy_var;;
+    6) reset_settings;;
     *) settings_menu ;;
     esac
 }
@@ -205,7 +251,7 @@ check_ifaces(){
 
 blackout_menu(){
     banner
-    printf "| \e[0m\e[96mBlackout UI v1\e[0m | \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
+    printf "| \e[0m\e[96mBlackout UI v1 (dev)\e[0m | \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
 
 [ Choose option: ]
 
@@ -233,21 +279,36 @@ wps_blackout(){
     banner
     chk_iface $first_iface
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
-    printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks using \e[92m$first_iface\e[0m... \n"
+    printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks using config below:\n"
 
-    #iq200 sorting wps networks by signal strenght
-    awker="$(pwd)/config/wifi.awk"
-    wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
-    wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
-    wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6 $7}'))
-    wps_bssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $2}'))
-    wps_channel=($(printf "$wps_all" | grep -a "yes" | awk '{print $4}'))
-
-    i=0
-    while [ $i -lt ${#wps_bssid[@]} ]
+    printf "
+<------Config------>
+interface: \e[92m$first_iface\e[0m
+mac_changer: \e[92m$mac_changer\e[0m
+automode: \e[92m$automode\e[0m
+scan_accuracy: \e[92m$scan_accuracy\e[0m
+<------------------>
+"
+    tput sc
+    x=0
+    while [ $x -lt $scan_accuracy ]
     do
-        printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wps_ssid[$i]} \e[93m${wps_bssid[$i]} \e[94mpwr:${wps_power[$i]} \e[96mchnl:${wps_channel[$i]}\e[0m"
-        i=$((i+1))
+        # tput sc
+        #iq200 sorting wps networks by signal strenght
+        awker="$(pwd)/config/wifi.awk"
+        wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
+        wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
+        wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6 $7}'))
+        wps_bssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $2}'))
+        wps_channel=($(printf "$wps_all" | grep -a "yes" | awk '{print $4}'))
+        tput rc
+        i=0
+        while [ $i -lt ${#wps_bssid[@]} ]
+        do
+            printf "\n[\e[92m$((i+1))\e[0m] \e[92m${wps_ssid[$i]} \e[93m${wps_bssid[$i]} \e[94mpwr:${wps_power[$i]} \e[96mchnl:${wps_channel[$i]}\e[0m"
+            i=$((i+1))
+        done
+        x=$((x+1))
     done
 
     if [ -z "${#wps_bssid[@]}" ];
@@ -321,9 +382,9 @@ wps_blackout(){
 set_managed() {
     iface=$1
     printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in managed mode... \n"
-    sudo ip link set $iface down
-    sudo iw $iface set type managed
-    sudo ip link set $iface up
+    ip link set $iface down
+    iw $iface set type managed
+    ip link set $iface up
     printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on $iface! \n"
 
 }
@@ -331,9 +392,9 @@ set_managed() {
 set_mmode(){
     iface=$1
     printf "\n\e[0m[\e[93m*\e[0m] Putting $iface in monitor mode... \n"
-    sudo ip link set $iface down
-    sudo iw $iface set monitor control
-    sudo ip link set $iface up
+    ip link set $iface down
+    iw $iface set monitor control
+    ip link set $iface up
     printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on $iface! \n"
 }
 
@@ -394,9 +455,8 @@ deauth_blackout(){
     set_mmode $second_iface
 
     printf "\n\e[0m[\e[93m*\e[0m] Running MDK4 on ${#target_bssid[@]} SSID/s, use Ctrl+C to abort!\n\n"
-    mdk4 $second_iface d -b $ssid_config
+    mdk4 $second_iface d -b $ssid_config 
 
-    back_to_menu
 }
 
 # beacon_blackout(){
@@ -417,10 +477,10 @@ all_blackout(){
     set_mmode $second_iface
     printf "\n\e[0m[\e[92mi\e[0m] Using config below! \n"
     printf "
------All-in-one-----
-| Deauth: $auto_deauth 
-| Beacon: $auto_beacon 
---------------------
+<-----All-in-one----->
+Deauth: $auto_deauth 
+Beacon: $auto_beacon 
+<-------------------->
 "
     # printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
 
