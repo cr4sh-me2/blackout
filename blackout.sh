@@ -263,14 +263,23 @@ set_mmode(){
 }
 
 iface_macchanger(){
-    banner
     iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Changing MAC address on \e[92m$iface\e[0m... \n"
     ip link set $iface down
+    sleep 0.5
     macchanger -r $iface &>/dev/null
+    sleep 0.5
     ip link set $iface up
-    printf "\e[0m[\e[92mi\e[0m] Changed MAC address on \e[92m$iface\e[0m! \n"
 }
+
+wait_for(){
+    iface=$1
+    while ! ip route | grep -qoP "default via .+ dev $iface";
+    do
+        printf "\n\e[0m[\e[93m*\e[0m] Waiting 5s for \e[92m$iface\e[0m to become avaiable...\n"
+        sleep 5
+        ip link set $iface up
+    done
+    }
 
 wps_blackout(){
     banner
@@ -279,31 +288,54 @@ wps_blackout(){
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WPS networks using config below:\n"
 
     printf "
-<------Config------>
-interface: \e[92m$first_iface\e[0m
-automode: \e[92m$automode\e[0m
-scan_accuracy: \e[92m$scan_accuracy\e[0m
-blacklist: \e[92m$blacklist\e[0m
-<------------------>
+<---------------------------Config--------------------------->
+\e[96minterface\e[0m: \e[92m$first_iface\e[0m [ no monitor mode needed ]\n"
+if [ $automode == 1 ];
+then
+    printf "\e[96mautomode\e[0m: \e[92m$automode\e[0m [ automode is turned on ]\n"
+else
+    printf "\e[96mautomode\e[0m: \e[91m$automode\e[0m [ automode is turned off ]\n"
+fi
+
+    printf "\e[96mscan_accuracy\e[0m: \e[92m$scan_accuracy\e[0m [ repeating scan for \e[92m$scan_accuracy\e[0m times ]\n"
+
+if [ $blacklist == 1 ];
+then
+    count_blacklist=$(cat $blacklist_path | wc -l)
+    printf "\e[96mblacklist\e[0m: \e[92m$blacklist\e[0m [ \e[92m$count_blacklist\e[0m ssids that attack failed on, will be hidden ]\n"
+else
+    printf "\e[96mblacklist\e[0m: \e[91m$blacklist\e[0m [ displaying all ssids ]\n"
+fi
+
+if [ $mac_changer == 1 ];
+then 
+    iface_macchanger $first_iface
+    mac=$(ifconfig $first_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+    printf "\e[96mmac_changer\e[0m: \e[92m$mac_changer\e[0m [ Changed \e[92m$first_iface\e[0m MAC to: \e[93m$mac\e[0m ]\n"
+else 
+    printf "\e[96mmac_changer\e[0m: \e[91m$mac_changer\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
+fi
+
+    printf "<------------------------------------------------------------>
 "
+    set_managed $first_iface
+
+    wait_for $first_iface
+
     tput sc
     x=0
     while [ $x -lt $scan_accuracy ]
     do
-        # tput sc
         #iq200 sorting wps networks by signal strenght
         awker="$(pwd)/config/wifi.awk"
-        if [ $blacklist == 1 ] #&& [ -s $blacklist_path ]; #if file is not-empty
+        if [ $blacklist == 1 ];
         then
-            # display_blacklist=$(cat $blacklist_path)
-            count_blacklist=$(cat $blacklist_path | wc -l)
-            printf "\n\e[0m[\e[93m*\e[0m] Blacklisting $count_blacklist SSID/s... \n"
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort | grep -iv -f $blacklist_path)
         else
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
         fi
         wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
-        wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6 $7}'))
+        wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6}'))
         wps_bssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $2}'))
         wps_channel=($(printf "$wps_all" | grep -a "yes" | awk '{print $4}'))
         tput rc
@@ -321,7 +353,7 @@ blacklist: \e[92m$blacklist\e[0m
         printf "\n\n\e[0m[\e[91m!\e[0m] No WPS networks found! \n"
         back_to_menu
     else
-        printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS networks! \n"
+        printf "\n\n\e[0m[\e[92mi\e[0m] Found ${#wps_bssid[@]} WPS-open networks! \n"
     fi
 
     printf "\n[ Select (\e[92m1\e[0m-\e[92m${#wps_bssid[@]}\e[0m) \e[92mone\e[0m, \e[92mmultiple\e[0m comma-separated or press [\e[92mENTER\e[0m] for all target/s: ]\n\n"
@@ -418,18 +450,35 @@ blacklist: \e[92m$blacklist\e[0m
 deauth_blackout(){
     banner
     chk_iface $second_iface
-    set_managed $second_iface
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
     printf "\n\e[0m[\e[93m*\e[0m] Scanning for WiFi networks using config below:\n"
 
     printf "
-<------Config------>
-interface: \e[92m$second_iface\e[0m
-automode: \e[92m$automode\e[0m
-scan_accuracy: \e[92m$scan_accuracy\e[0m
-<------------------>
-"
-    
+<---------------------------Config--------------------------->
+\e[96minterface\e[0m: \e[92m$second_iface\e[0m [ monitor mode support needed ]\n"
+if [ $automode == 1 ];
+then
+    printf "\e[96mautomode\e[0m: \e[92m$automode\e[0m [ automode is turned on ]\n"
+else
+    printf "\e[96mautomode\e[0m: \e[91m$automode\e[0m [ automode is turned off ]\n"
+fi
+    printf "\e[96mscan_accuracy\e[0m: \e[92m$scan_accuracy\e[0m [ repeating scan for \e[92m$scan_accuracy\e[0m times ]\n"
+
+if [ $mac_changer == 1 ];
+then 
+    iface_macchanger $second_iface
+    mac=$(ifconfig $second_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+    printf "\e[96mmac_changer\e[0m: \e[92m$mac_changer\e[0m [ Changed \e[92m$second_iface\e[0m MAC to: \e[93m$mac\e[0m ]\n"
+else 
+    printf "\e[96mmac_changer\e[0m: \e[91m$mac_changer\e[0m [ Current \e[92m$second_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
+fi
+
+    printf "<------------------------------------------------------------>
+"    
+
+    set_managed $second_iface
+
+    wait_for $second_iface
 
     tput sc
     x=0
@@ -440,7 +489,7 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
         awker="$(pwd)/config/wifi.awk"
         wifi_all=$(iw dev $second_iface scan duration 15 | awk -f $awker | sort)
         wifi_power=($(printf "$wifi_all" | awk '{print $1}'))
-        wifi_ssid=($(printf "$wifi_all"  | awk '{print $5 $6 $7}')) 
+        wifi_ssid=($(printf "$wifi_all"  | awk '{print $5 $6}')) 
         wifi_bssid=($(printf "$wifi_all" | awk '{print $2}'))
         wifi_channel=($(printf "$wifi_all" | awk '{print $4}'))
         tput rc
