@@ -283,6 +283,7 @@ wps_blackout(){
 interface: \e[92m$first_iface\e[0m
 automode: \e[92m$automode\e[0m
 scan_accuracy: \e[92m$scan_accuracy\e[0m
+blacklist: \e[92m$blacklist\e[0m
 <------------------>
 "
     tput sc
@@ -292,7 +293,15 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
         # tput sc
         #iq200 sorting wps networks by signal strenght
         awker="$(pwd)/config/wifi.awk"
-        wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
+        if [ $blacklist == 1 ] #&& [ -s $blacklist_path ]; #if file is not-empty
+        then
+            # display_blacklist=$(cat $blacklist_path)
+            count_blacklist=$(cat $blacklist_path | wc -l)
+            printf "\n\e[0m[\e[93m*\e[0m] Blacklisting $count_blacklist SSID/s... \n"
+            wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort | grep -iv -f $blacklist_path)
+        else
+            wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
+        fi
         wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
         wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6 $7}'))
         wps_bssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $2}'))
@@ -368,9 +377,18 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
             if printf $psk | grep -q "BSSID";
             then
                 printf "\n\e[0m[\e[92mi\e[0m] Found ${target_ssid[$y]} password! \n"
-                printf "\n$psk"
+                printf "\n\e[92m$psk\e[0m"
             else
                 printf "\n\e[0m[\e[91m!\e[0m] ${target_ssid[$y]} password not found! \n"
+                printf "\n\e[0m[\e[93m*\e[0m] Adding ${target_bssid[$y]} to blacklist... \n"
+                if grep -Fxq "${target_bssid[$y]}" $blacklist_path
+                then
+                    printf "\n\e[0m[\e[92mi\e[0m] BSSID is already in blacklist!"  
+                else
+                    printf ${target_bssid[$y]} >> $blacklist_path
+                    printf "\n\e[0m[\e[92mi\e[0m] Added!"  
+                fi
+
             fi
         fi
         
@@ -389,7 +407,7 @@ scan_accuracy: \e[92m$scan_accuracy\e[0m
 
     if [ $disconnect == 1 ];
     then
-        printf "\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n"
+        printf "\n\n\e[0m[\e[92mi\e[0m] Backing up wifi network connection...\n"
         LC_ALL=C nmcli --fields UUID,TIMESTAMP-REAL con show | grep -v "UUID\|TIMESTAMP-REAL\|never" |  awk '{print $1}' | while read line;
         do nmcli con up uuid $line &>/dev/null;    
         done
