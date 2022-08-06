@@ -19,3 +19,4 @@ Deauth Blackout - MDK4
 `automode=0` - (boolean) Do not ask for target number, select all!    
 `scan_accuracy=2` - (number) Repeat scan process x times  
 `mac_changer=1` - (boolean) Change MAC address before starting attack  
+`blacklist=1` - (boolean) If attack fails, BSSID its added to blacklist. You can hide BSSID's that failed for next scan
