@@ -18,5 +18,5 @@ Deauth Blackout - MDK4
 `second_iface=wlan1` - (string) Interface to perform monitor mode attacks  
 `automode=0` - (boolean) Do not ask for target number, select all!    
 `scan_accuracy=2` - (number) Repeat scan process x times  
-`waiter=1` - (boolean) Wait before doing anything, if interface is busy
+`waiter=1` - (boolean) Wait before doing anything, if interface is busy  
 `blacklist=1` - (boolean) If attack fails, BSSID its added to blacklist. You can hide BSSID's that failed for next scan
