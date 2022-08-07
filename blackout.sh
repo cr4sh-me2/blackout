@@ -210,7 +210,7 @@ banner() {
 
 blackout_menu() {
     banner
-    printf "| \e[0m\e[96mBlackout UI v1 \e[0m | \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
+    printf "| \e[0m\e[96mBlackout UI v1 \e[0m| \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
 
 [ Choose option: ]
 
