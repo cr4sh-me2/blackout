@@ -210,7 +210,7 @@ banner() {
 
 blackout_menu() {
     banner
-    printf "| \e[0m\e[96mBlackout UI v1 (dev)\e[0m | \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
+    printf "| \e[0m\e[96mBlackout UI v1 \e[0m | \e[0m\e[95mgithub.com/rkhunt3r/blackout\e[0m | $updates_string |
 
 [ Choose option: ]
 
@@ -238,33 +238,30 @@ blackout_menu() {
 wait_for() {
     iface=$1
     while ! ip route | grep -qoP "default via .+ dev $iface"; do
-        printf "\n\e[0m[\e[93m*\e[0m] Waiting 5s for \e[92m$iface\e[0m to become avaiable...\n"
+        printf "\n\e[0m[\e[93m*\e[0m] Waiting 8s for \e[92m$iface\e[0m to become avaiable...\n"
         nohup ifconfig $iface up >/dev/null 2>&1 &
-        nohup sleep 5 >/dev/null 2>&1 &
+        sleep 8
         wait
     done
 }
 
 set_managed() {
     iface=$1
-    wait_for $iface
     printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in managed mode... \n"
     ip link set $iface down
     iw $iface set type managed
     ip link set $iface up
-    wait_for $iface
     printf "\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
 
 }
 
 set_mmode() {
     iface=$1
-    wait_for $iface
     printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in monitor mode... \n"
     ip link set $iface down
     iw $iface set monitor control
     ip link set $iface up
-    wait_for $iface
+    sleep 3
     printf "\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
 }
 
@@ -293,27 +290,16 @@ wps_blackout() {
         printf "\e[96mblacklist\e[0m: \e[91m$blacklist\e[0m [ displaying all ssids ]\n"
     fi
 
-    if [ $waiter == 1 ]; then
-        printf "\e[96mwaiter\e[0m: \e[92m$waiter\e[0m [ waiting for interface before action ]\n"
-    else
-        printf "\e[96mwaiter\e[0m: \e[91m$waiter\e[0m [ not waiting for interface before action ]\n"
-    fi
-
     mac=$(ifconfig $first_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
     printf "\e[96mMAC address\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
 
     printf "<------------------------------------------------------------>
 "
-
     tput sc
     x=0
     while [ $x -lt $scan_accuracy ]; do
         #iq200 sorting wps networks by signal strenght
         awker="$(pwd)/config/wifi.awk"
-
-        if [ $waiter == 1 ]; then
-            wait_for $first_iface
-        fi
 
         if [ $blacklist == 1 ]; then
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort | grep -iv -f $blacklist_path)
@@ -515,13 +501,8 @@ deauth_blackout() {
     fi
     printf "\e[96mscan_accuracy\e[0m: \e[92m$scan_accuracy\e[0m [ repeating scan for \e[92m$scan_accuracy\e[0m times ]\n"
 
-    if [ $mac_changer == 1 ]; then
-        iface_macchanger $second_iface
-        mac=$(ifconfig $second_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
-        printf "\e[96mmac_changer\e[0m: \e[92m$mac_changer\e[0m [ Changed \e[92m$second_iface\e[0m MAC to: \e[93m$mac\e[0m ]\n"
-    else
-        printf "\e[96mmac_changer\e[0m: \e[91m$mac_changer\e[0m [ Current \e[92m$second_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
-    fi
+    mac=$(ifconfig $second_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+    printf "\e[96mmac_changer\e[0m: [ Current \e[92m$second_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
 
     printf "<------------------------------------------------------------>
 "
@@ -531,10 +512,6 @@ deauth_blackout() {
     tput sc
     x=0
     while [ $x -lt $scan_accuracy ]; do
-        if [ $waiter == 1 ]; then
-            wait_for $second_iface
-        fi
-
         #iq200 sorting wps networks by signal strenght
         awker="$(pwd)/config/wifi.awk"
         wifi_all=$(iw dev $second_iface scan duration 15 | awk -f $awker | sort)
