@@ -353,8 +353,7 @@ printf "\e[96mMAC address\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$
         awker="$(pwd)/config/wifi.awk"
 
         if [ $blacklist == 1 ];
-        then
-            wait_for $iface     
+        then  
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort | grep -iv -f $blacklist_path)
             if [ ! -n "$wps_all" ];
             then
@@ -471,6 +470,7 @@ printf "\e[96mMAC address\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$
                     fi
                 fi
             fi
+            wait_for $iface   
         fi
         
         if [ $automode == 0 ];
