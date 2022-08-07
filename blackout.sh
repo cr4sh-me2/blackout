@@ -126,7 +126,7 @@ reset_settings() {
     sed -i "s/first_iface\=.*/first_iface=wlan0/" $settings_file
     sed -i "s/automode\=.*/automode=0/" $settings_file
     sed -i "s/scan_accuracy\=.*/scan_accuracy=2/" $settings_file
-    sed -i "s/mac_changer\=.*/mac_changer=1/" $settings_file
+    sed -i "s/waiter\=.*/waiter=1/" $settings_file
     sed -i "s/second_iface\=.*/second_iface=wlan1/" $settings_file
     source $settings_file
     config_settings
