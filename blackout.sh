@@ -1,8 +1,8 @@
 #!/bin/bash
 # WPS Blackout by @rkhunt3r
 
-# first_iface="wlan0"
-# second_iface="wlan1"
+# sudo apt install tlp
+
 
 ssid_config="config/ssid.txt"
 settings_file="config/settings.conf"
@@ -236,55 +236,49 @@ esac
 
 }
 
-if_busy(){
-    iface=$1
-    if [ $(! ip route | grep -qoP "default via .+ dev $iface") ];
-    then
-        printf "\n\e[0m[\e[91m!\e[0m] Interface \e[92m$iface\e[0m is busy!\n"
-        wait_for $iface
-    else
-        printf "\n\e[0m[\e[92mi\e[0m] Interface \e[92m$iface\e[0m is ready to go!\n"
-    fi
-}
-
 wait_for(){
     iface=$1
     while ! ip route | grep -qoP "default via .+ dev $iface";
     do
-        printf "\n\e[0m[\e[93m*\e[0m] Waiting 5s for \e[92m$iface\e[0m to become avaiable...\n"
-        sleep 5
-        ip link set $iface up
+        # printf "\n\e[0m[\e[93m*\e[0m] Waiting 5s for \e[92m$iface\e[0m to become avaiable...\n"
+        nohup ifconfig $iface up > /dev/null 2>&1&
+        wait
     done
-    }
+}
 
 set_managed() {
     iface=$1
+    wait_for $iface
     printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in managed mode... \n"
     ip link set $iface down
     iw $iface set type managed 
     ip link set $iface up
-    if_busy $iface
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
+    wait_for $iface
+    printf "\e[0m[\e[92mi\e[0m] Enabled managed mode on \e[92m$iface\e[0m! \n"
 
 }
 
 set_mmode(){
     iface=$1
+    wait_for $iface
     printf "\n\e[0m[\e[93m*\e[0m] Putting \e[92m$iface\e[0m in monitor mode... \n"
     ip link set $iface down
     iw $iface set monitor control
     ip link set $iface up
-    if_busy $iface
-    printf "\n\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
+    wait_for $iface
+    printf "\e[0m[\e[92mi\e[0m] Enabled monitor mode on \e[92m$iface\e[0m! \n"
 }
 
 iface_macchanger(){
     iface=$1
-    ip link set $iface down
-    # sleep 0.5
-    macchanger -r $iface &>/dev/null
-    # sleep 0.5
-    ip link set $iface up
+    wait_for $iface
+    # nohup ip link set $iface down > /dev/null 2>&1&
+    nohup ifconfig $iface down > /dev/null 2>&1&
+    nohup macchanger -r $iface > /dev/null 2>&1&
+    # nohup ip link set $iface up > /dev/null 2>&1&
+    nohup ifconfig $iface up > /dev/null 2>&1&
+    wait
+    wait_for $iface
 }
 
 wps_blackout(){
@@ -343,32 +337,42 @@ else
     printf "\e[96mblacklist\e[0m: \e[91m$blacklist\e[0m [ displaying all ssids ]\n"
 fi
 
-if [ $mac_changer == 1 ];
-then 
-    iface_macchanger $first_iface
-    mac=$(ifconfig $first_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
-    printf "\e[96mmac_changer\e[0m: \e[92m$mac_changer\e[0m [ Changed \e[92m$first_iface\e[0m MAC to: \e[93m$mac\e[0m ]\n"
-else 
-    printf "\e[96mmac_changer\e[0m: \e[91m$mac_changer\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
-fi
+mac=$(ifconfig $first_iface | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+printf "\e[96mMAC address\e[0m [ Current \e[92m$first_iface\e[0m MAC is: \e[93m$mac\e[0m ]\n"
 
     printf "<------------------------------------------------------------>
 "
-    set_managed $first_iface
-
-    wait_for $first_iface
+    # wait_for $iface
 
     tput sc
     x=0
     while [ $x -lt $scan_accuracy ]
     do
         #iq200 sorting wps networks by signal strenght
+        # wait_for $first_iface ### WAIT IF INTERFACE IS UNAVAIABLE
         awker="$(pwd)/config/wifi.awk"
+
         if [ $blacklist == 1 ];
         then
+            wait_for $iface     
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort | grep -iv -f $blacklist_path)
+            if [ ! -n "$wps_all" ];
+            then
+                printf "\n\e[0m[\e[91m!\e[0m] Catched error! Retrying in 5s... \n"
+                sleep 5
+                wait_for $first_iface
+                wps_blackout
+            fi
         else
+            wait_for $iface
             wps_all=$(iw dev $first_iface scan duration 15 | awk -f $awker | sort)
+            if [ ! -n "$wps_all" ];
+            then
+                printf "\n\e[0m[\e[91m!\e[0m] Catched error! Retrying in 5s... \n"
+                sleep 5
+                wait_for $first_iface
+                wps_blackout
+            fi
         fi
         wps_power=($(printf "$wps_all" | grep -a "yes" | awk '{print $1}'))
         wps_ssid=($(printf "$wps_all" | grep -a "yes" | awk '{print $5 $6}'))
